@@ -1,41 +1,29 @@
-import os
-import time
-
 from src.pho.execution.scheduler import ParallelScheduler
 
 
-def evaluate_task(task):
-    time.sleep(1)
-
-    return {
-        "task_id": task.task_id,
-        "parameters": task.parameters,
-        "process_id": os.getpid()
-    }
+def double_task(task):
+    """Double the task value."""
+    return task.parameters["value"] * 2
 
 
-if __name__ == "__main__":
-    parameter_combinations = [
-        {"n_estimators": 10},
-        {"n_estimators": 20},
-        {"n_estimators": 30},
-        {"n_estimators": 40},
+def test_scheduler():
+
+    scheduler = ParallelScheduler(
+        max_workers=2
+    )
+
+    parameters = [
+        {"value": 1},
+        {"value": 2},
+        {"value": 3},
+        {"value": 4}
     ]
 
-    scheduler = ParallelScheduler(max_workers=4)
-
-    start = time.perf_counter()
-
     results = scheduler.execute(
-        parameter_combinations,
-        evaluate_task
+        parameters,
+        double_task
     )
 
-    elapsed = time.perf_counter() - start
+    values = sorted(results)
 
-    print("Results:", results)
-    print("Elapsed time:", round(elapsed, 2), "seconds")
-    print(
-        "Unique worker processes:",
-        len(set(result["process_id"] for result in results))
-    )
+    assert values == [2, 4, 6, 8]

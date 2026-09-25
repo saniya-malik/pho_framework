@@ -1,21 +1,23 @@
-from time import perf_counter
-
 import numpy as np
 from sklearn.base import clone
 from sklearn.model_selection import cross_val_score
+from time import perf_counter
 
 from src.pho.execution.scheduler import ParallelScheduler
 
 
-def evaluate_random_configuration(task_data):
-    """
-    Evaluate one randomly selected hyperparameter configuration.
+def evaluate_grid_configuration(task_data):
+    """Evaluate one hyperparameter configuration."""
 
-    This is a standalone function so it can safely be executed
-    by ProcessPoolExecutor workers.
-    """
-
-    task_id, parameters, estimator, X, y, cv, scoring = task_data
+    (
+        task_id,
+        parameters,
+        estimator,
+        X,
+        y,
+        cv,
+        scoring
+    ) = task_data
 
     model = clone(estimator)
 
@@ -37,30 +39,26 @@ def evaluate_random_configuration(task_data):
     }
 
 
-class ParallelRandomSearch:
+class ParallelGridSearch:
     """
-    Parallel random hyperparameter search.
+    Parallel hyperparameter grid search.
 
-    Randomly samples a fixed number of configurations
-    and evaluates them using multiple worker processes.
+    Evaluates all hyperparameter combinations
+    using multiple worker processes.
     """
 
     def __init__(
         self,
         estimator,
-        param_distributions,
-        n_iter=10,
+        param_grid,
         cv=3,
         scoring=None,
-        random_state=42,
         max_workers=4
     ):
         self.estimator = estimator
-        self.param_distributions = param_distributions
-        self.n_iter = n_iter
+        self.param_grid = param_grid
         self.cv = cv
         self.scoring = scoring
-        self.random_state = random_state
         self.max_workers = max_workers
 
         self.best_params_ = None
@@ -69,43 +67,35 @@ class ParallelRandomSearch:
         self.elapsed_time_ = None
 
     def _generate_combinations(self):
-        """Generate random hyperparameter combinations."""
+        """Generate all hyperparameter combinations."""
 
-        rng = np.random.default_rng(
-            self.random_state
-        )
+        from itertools import product
 
-        keys = list(
-            self.param_distributions.keys()
-        )
+        keys = list(self.param_grid.keys())
+
+        values = [
+            self.param_grid[key]
+            for key in keys
+        ]
 
         combinations = []
 
-        for _ in range(self.n_iter):
+        for combination in product(*values):
 
-            parameters = {}
-
-            for key in keys:
-
-                values = self.param_distributions[key]
-
-                index = rng.integers(
-                    0,
-                    len(values)
-                )
-
-                parameters[key] = values[index]
-
-            combinations.append(parameters)
+            combinations.append(
+                dict(zip(keys, combination))
+            )
 
         return combinations
 
     def fit(self, X, y):
-        """Run the complete random search."""
+        """Run the parallel grid search."""
 
         start_time = perf_counter()
 
-        combinations = self._generate_combinations()
+        combinations = (
+            self._generate_combinations()
+        )
 
         scheduler = ParallelScheduler(
             max_workers=self.max_workers
@@ -127,7 +117,7 @@ class ParallelRandomSearch:
 
         results = scheduler.worker_pool.execute(
             tasks,
-            evaluate_random_configuration
+            evaluate_grid_configuration
         )
 
         self.results_ = results
@@ -157,7 +147,7 @@ class ParallelRandomSearch:
         return self.results_
 
     def summary(self):
-        """Return a summary of the search."""
+        """Return a search summary."""
 
         return {
             "best_params": self.best_params_,
@@ -165,5 +155,6 @@ class ParallelRandomSearch:
             "elapsed_time": self.elapsed_time_,
             "total_configurations": len(
                 self.results_
-            )
+            ),
+            "max_workers": self.max_workers
         }

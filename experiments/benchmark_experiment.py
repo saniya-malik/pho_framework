@@ -18,6 +18,7 @@ from src.pho.benchmarking.benchmark import (
     calculate_efficiency,
     calculate_speedup,
 )
+from src.pho.benchmarking.scalability import ScalabilityAnalyzer
 from src.pho.execution.scheduler import ParallelScheduler
 
 
@@ -127,6 +128,7 @@ if __name__ == "__main__":
         f"{len(PARAMETER_COMBINATIONS)}"
     )
 
+    # Run sequential baseline.
     sequential_results, sequential_time = run_sequential()
 
     print(
@@ -134,8 +136,12 @@ if __name__ == "__main__":
         f"{sequential_time:.4f} seconds"
     )
 
+    # Initialize scalability analyzer.
+    analyzer = ScalabilityAnalyzer()
+
     benchmark_results = []
 
+    # Test different numbers of parallel workers.
     for workers in [1, 2, 4]:
 
         parallel_results, parallel_time = run_parallel(
@@ -159,14 +165,32 @@ if __name__ == "__main__":
             "efficiency": efficiency
         })
 
+        # Store result in scalability analyzer.
+        analyzer.add_result(
+            workers=workers,
+            execution_time=parallel_time,
+            speedup=speedup,
+            efficiency=efficiency
+        )
+
         print(f"\nWorkers: {workers}")
+
         print(
             f"Parallel execution time: "
             f"{parallel_time:.4f} seconds"
         )
-        print(f"Speedup: {speedup:.4f}")
-        print(f"Efficiency: {efficiency:.4f}")
 
+        print(
+            f"Speedup: "
+            f"{speedup:.4f}"
+        )
+
+        print(
+            f"Efficiency: "
+            f"{efficiency:.4f}"
+        )
+
+    # Find the best configuration from sequential results.
     best_result = max(
         sequential_results,
         key=lambda result: result["score"]
@@ -174,3 +198,11 @@ if __name__ == "__main__":
 
     print("\nBest configuration:")
     print(best_result)
+
+    # Save scalability measurements.
+    analyzer.save_csv(
+        "results/scalability.csv"
+    )
+
+    print("\nScalability results saved to:")
+    print("results/scalability.csv")
