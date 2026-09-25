@@ -1,0 +1,2 @@
+[console_scripts]
+pho = src.pho.cli:main
